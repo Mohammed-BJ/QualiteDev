@@ -201,7 +201,210 @@ Etablir la matrice de tests.
 
 Ajouter à votre projet les tests définis dans la matrice de tests.
 
+package com.example.demo.data;
 
-    
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.util.*;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+@SpringBootTest
+public class VoitureTest {
+
+    Voiture v1;
+
+    @BeforeEach
+    void CreationVoiture(){
+        this.v1 = new Voiture("Audi",15000);
+    }
+    @Test
+    void creerVoiture(){
+        assertEquals(1,1);
+    }
+
+    @Test
+    void  TestVoiture(){
+
+        assertEquals("Audi",v1.getMarque());
+        assertEquals(15000,v1.getPrix());
+        assertEquals(0,v1.getId());
+
+        String expectedToString = "Car{marque='Audi', prix=15000, id=0}";
+        assertEquals(expectedToString, v1.toString());
+
+        v1.setId(1);
+        v1.setMarque("Renault");
+        v1.setPrix(10000);
+
+        assertEquals(1,v1.getId());
+        assertEquals("Renault",v1.getMarque());
+        assertEquals(10000,v1.getPrix());
+
+    }
+
+    package com.example.demo.service;
+
+import com.example.demo.data.Voiture;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import java.util.ArrayList;
+import java.util.Iterator;
+import static org.junit.jupiter.api.Assertions.*;
+
+
+import static org.mockito.Mockito.*;
+
+
+@SpringBootTest
+public class StatistiqueTests {
+
+    @MockBean
+    StatistiqueImpl statistiqueImpl;
+    @Mock
+    private Voiture voiture1;
+    @Mock
+    private Voiture voiture2;
+    @Mock
+    private Voiture voiture3;
+
+    @Mock
+    private ArrayList<Voiture> ListVoiture;
+
+    @Test
+    @BeforeEach
+    public void CreationVoiture(){
+
+        MockitoAnnotations.initMocks(this);
+
+        voiture1 = new Voiture("Renault",2000);
+        voiture2 = new Voiture("Mercedes", 2000);
+        voiture3 = new Voiture("Pegot",2000);
+
+        ListVoiture = new ArrayList<Voiture>();
+
+    }
+
+    @Test
+    public Echantillon testPrixMoyen() throws ArithmeticException {
+        statistiqueImpl.ajouter(voiture1);
+        statistiqueImpl.ajouter(voiture2);
+        statistiqueImpl.ajouter(voiture3);
+
+        Echantillon echantillon = statistiqueImpl.prixMoyen();
+
+        assertNotNull(echantillon);
+        assertEquals(3, echantillon.getNombreDeVoitures());
+        assertEquals(6000, echantillon.getPrixMoyen());
+
+        return echantillon;
+    }
+
+}
+
+package com.example.demo.web;
+
+import com.example.demo.data.Voiture;
+import com.example.demo.service.Echantillon;
+import com.example.demo.service.StatistiqueImpl;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+class WebTests {
+
+    @MockBean
+    StatistiqueImpl statistiqueImpl;
+
+    @Autowired
+    MockMvc mockMvc;
+
+    @Test
+    void testGetStatistiques() throws Exception {
+        Echantillon echantillon = new Echantillon();
+        echantillon.setPrixMoyen(15000);
+
+        when(statistiqueImpl.prixMoyen()).thenReturn(echantillon);
+
+        mockMvc.perform(get("/statistique"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prixMoyen").value(15000))
+                .andDo(print());
+
+        verify(statistiqueImpl, times(1)).prixMoyen();
+    }
+
+    @Test
+    void testCreerVoiture() throws Exception {
+
+        Voiture voiture = new Voiture();
+        voiture.setMarque("Toyota");
+        voiture.setMarque("Corolla");
+        voiture.setPrix(20000);
+
+        mockMvc.perform(post("/voiture")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"marque\":\"Toyota\",\"modele\":\"Corolla\",\"prix\":20000}"))
+                .andExpect(status().isOk())
+                .andDo(print());
+
+        verify(statistiqueImpl, times(1)).ajouter(any(Voiture.class));
+    }
+}
+
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '2.7.5'
+	id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+	id 'jacoco'
+	id 'org.barfuin.gradle.jacocolog' version '1.0.1'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '1.8'
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'com.h2database:h2'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+test {
+	finalizedBy jacocoTestReport // report is always generated after tests run
+}
+
+jacocoTestReport {
+	dependsOn test // Les tests doivent être exécutés avant de générer le rapport
+	reports {
+		xml.enabled = true
+		html.enabled = true
+		csv.enabled = false
+	}
+}
 
